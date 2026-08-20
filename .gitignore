@@ -1,0 +1,18 @@
+# Dependencies
+frontend/node_modules/
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+
+# Environment variables (contains API keys - NEVER commit)
+backend/.env
+.env
+*.env.local
+
+# OS files
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
