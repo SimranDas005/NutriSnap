@@ -1,15 +1,23 @@
 export interface FoodDetection {
   name: string
   confidence: number
+  portion?: 'small' | 'medium' | 'large'
 }
 
 export interface AnalyzeResponse {
-  foods: FoodDetection[]
+  dish: string
+  parts: FoodDetection[]
 }
 
 export interface FoodSelection {
   name: string
   portion: 'small' | 'medium' | 'large'
+}
+
+export interface NutritionRequest {
+  dish: string
+  weight_grams: number
+  foods: FoodSelection[]
 }
 
 export interface NutritionEntry {

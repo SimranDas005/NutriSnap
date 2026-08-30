@@ -3,10 +3,12 @@ package models
 type FoodDetection struct {
 	Name       string  `json:"name"`
 	Confidence float64 `json:"confidence"`
+	Portion    string  `json:"portion"`
 }
 
 type AnalyzeResponse struct {
-	Foods []FoodDetection `json:"foods"`
+	Dish  string          `json:"dish"`
+	Parts []FoodDetection `json:"parts"`
 }
 
 type FoodSelection struct {
@@ -15,7 +17,9 @@ type FoodSelection struct {
 }
 
 type NutritionRequest struct {
-	Foods []FoodSelection `json:"foods"`
+	Dish        string          `json:"dish"`
+	WeightGrams float64         `json:"weight_grams"`
+	Foods       []FoodSelection `json:"foods"`
 }
 
 type NutritionEntry struct {

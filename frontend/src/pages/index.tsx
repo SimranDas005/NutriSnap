@@ -1,92 +1,90 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import UploadBox from '@/components/UploadBox'
-import FoodCard from '@/components/FoodCard'
 import LoadingScreen from '@/components/LoadingScreen'
 import { analyzeImage } from '@/services/analyze'
 import { calculateNutrition } from '@/services/nutrition'
-import { FoodDetection, NutritionResponse } from '@/types'
+import { AnalyzeResponse, NutritionResponse } from '@/types'
 
-type Step = 'upload' | 'loading' | 'review' | 'calculating' | 'done'
-
-interface FoodItem {
-  name: string
-  confidence: number
-  portion: 'small' | 'medium' | 'large'
-}
+type Step = 'upload' | 'loading' | 'weight' | 'calculating' | 'done'
 
 const steps = [
   { key: 'upload', label: 'Upload' },
-  { key: 'review', label: 'Review' },
   { key: 'results', label: 'Results' },
 ]
 
 export default function Home() {
   const router = useRouter()
   const [step, setStep] = useState<Step>('upload')
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [foods, setFoods] = useState<FoodItem[]>([])
+  const [objectUrl, setObjectUrl] = useState<string | null>(null)
+  const [dish, setDish] = useState<string>('')
+  const [weight, setWeight] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
 
-  const currentStepIndex = step === 'upload' || step === 'loading' ? 0 : step === 'review' ? 1 : step === 'calculating' ? 1 : 2
+  const currentStepIndex = step === 'upload' || step === 'loading' ? 0 : 1
 
   const handleImage = useCallback(async (file: File) => {
-    setImageFile(file)
+    if (objectUrl) URL.revokeObjectURL(objectUrl)
+    setObjectUrl(URL.createObjectURL(file))
+    setWeight('')
     setStep('loading')
     setError(null)
 
     try {
-      const result = await analyzeImage(file)
-      setFoods(
-        result.foods.map((f: FoodDetection) => ({ ...f, portion: 'medium' }))
-      )
-      setStep('review')
+      const detected: AnalyzeResponse = await analyzeImage(file)
+      if (!detected.dish || detected.parts.length === 0) {
+        throw new Error('Could not identify the dish. Please try another photo.')
+      }
+      setDish(detected.dish)
+      sessionStorage.setItem('nutrisnap_parts', JSON.stringify(detected))
+      setStep('weight')
     } catch (e: any) {
-      setFoods([{ name: '', confidence: 1, portion: 'medium' }])
       setError(e?.message || 'Unable to analyze image')
-      setStep('review')
+      setStep('upload')
     }
-  }, [])
+  }, [objectUrl])
 
-  const updateFood = useCallback((index: number, updates: Partial<FoodItem>) => {
-    setFoods((prev) =>
-      prev.map((f, i) => (i === index ? { ...f, ...updates } : f))
-    )
-  }, [])
-
-  const updatePortion = useCallback((index: number, portion: 'small' | 'medium' | 'large') => {
-    updateFood(index, { portion })
-  }, [updateFood])
-
-  const removeFood = useCallback((index: number) => {
-    setFoods((prev) => prev.filter((_, i) => i !== index))
-  }, [])
-
-  const addFood = useCallback(() => {
-    setFoods((prev) => [
-      ...prev,
-      { name: '', confidence: 1, portion: 'medium' },
-    ])
-  }, [])
-
-  const handleContinue = useCallback(async () => {
-    const valid = foods.filter((f) => f.name.trim())
-    if (valid.length === 0) return
-
+  const handleCalculate = useCallback(async () => {
+    const grams = parseFloat(weight)
+    if (!grams || grams <= 0) {
+      setError('Please enter the dish weight in grams.')
+      return
+    }
+    setError(null)
     setStep('calculating')
 
     try {
-      const result: NutritionResponse = await calculateNutrition(
-        valid.map((f) => ({ name: f.name, portion: f.portion as 'small' | 'medium' | 'large' }))
-      )
+      const detectedParts: AnalyzeResponse = JSON.parse(sessionStorage.getItem('nutrisnap_parts') || 'null')
+      if (!detectedParts) {
+        throw new Error('Detection data missing. Please re-upload the photo.')
+      }
+
+      const result: NutritionResponse = await calculateNutrition({
+        dish,
+        weight_grams: grams,
+        foods: detectedParts.parts.map((p) => ({
+          name: p.name,
+          portion: p.portion || 'medium',
+        })),
+      })
+
+      sessionStorage.setItem('nutrisnap_dish', dish)
+      sessionStorage.setItem('nutrisnap_weight', String(grams))
       sessionStorage.setItem('nutrisnap_result', JSON.stringify(result))
       setStep('done')
       router.push('/results')
-    } catch {
-      alert('Failed to calculate nutrition. Please try again.')
-      setStep('review')
+    } catch (e: any) {
+      setError(e?.message || 'Unable to calculate nutrition')
+      setStep('weight')
     }
-  }, [foods, router])
+  }, [dish, weight, router])
+
+  const handleBackToUpload = useCallback(() => {
+    setStep('upload')
+    setDish('')
+    setWeight('')
+    setError(null)
+  }, [])
 
   return (
     <main className="min-h-screen max-w-lg mx-auto px-4 py-8">
@@ -132,6 +130,18 @@ export default function Home() {
         ))}
       </div>
 
+      {error && (
+        <div className="mb-6 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl animate-fade-in">
+          <p className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {error}
+          </p>
+          <p className="text-xs text-amber-700 mt-1 ml-6">Try uploading a different photo.</p>
+        </div>
+      )}
+
       {/* Upload / Loading */}
       {(step === 'upload' || step === 'loading') && (
         <div className="animate-fade-in-scale">
@@ -141,76 +151,54 @@ export default function Home() {
 
       {step === 'loading' && <LoadingScreen />}
 
-      {/* Review */}
-      {step === 'review' && (
-        <div className="space-y-4 animate-fade-in-up">
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-6 bg-gradient-to-b from-emerald-400 to-emerald-600 rounded-full" />
-            <h2 className="text-lg font-bold text-gray-800">Review & Portions</h2>
-          </div>
-          <p className="text-sm text-gray-400">Edit the detected foods and choose your portion size for each item.</p>
+      {/* Weight input */}
+      {step === 'weight' && (
+        <div className="animate-fade-in-scale">
+          {objectUrl && (
+            <img
+              src={objectUrl}
+              alt="Uploaded dish"
+              className="w-full h-52 object-cover rounded-2xl shadow-lg shadow-gray-200/70 mb-6"
+            />
+          )}
 
-          {imageFile && (
-            <div className="relative rounded-2xl overflow-hidden shadow-md border border-gray-100 group">
-              <img src={URL.createObjectURL(imageFile)} alt="Meal" className="w-full h-40 object-cover transition-transform duration-300 group-hover:scale-[1.02]" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
-              <div className="absolute bottom-3 left-3">
-                <span className="text-[10px] font-semibold text-white/90 bg-black/30 backdrop-blur-sm px-2.5 py-1 rounded-full uppercase tracking-wider">
-                  Your meal photo
-                </span>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h2 className="text-xl font-extrabold text-gray-800">{dish}</h2>
+            <p className="text-sm text-gray-500 mt-1 font-medium">
+              Enter the total weight of the dish so we can estimate its nutrients.
+            </p>
+
+            <div className="mt-5">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                Dish weight
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="1"
+                  step="1"
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  placeholder="e.g. 350"
+                  className="flex-1 px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-base font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent placeholder:text-gray-300"
+                />
+                <span className="text-sm font-bold text-gray-400">grams</span>
               </div>
             </div>
-          )}
 
-          {error && (
-            <div className="px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl animate-fade-in">
-              <p className="text-sm font-semibold text-amber-800 flex items-center gap-2">
-                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Could not auto-detect: {error}
-              </p>
-              <p className="text-xs text-amber-700 mt-1 ml-6">Enter the food name manually below.</p>
-            </div>
-          )}
-
-          {foods.map((food, i) => (
-            <div key={i} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.08}s` }}>
-              <FoodCard
-                name={food.name}
-                confidence={food.confidence}
-                portion={food.portion}
-                onNameChange={(name) => updateFood(i, { name })}
-                onPortionChange={(portion) => updatePortion(i, portion)}
-                onRemove={() => removeFood(i)}
-              />
-            </div>
-          ))}
-
-          <button
-            onClick={addFood}
-            className="w-full py-3.5 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 hover:border-emerald-400 hover:text-emerald-500 hover:bg-emerald-50/50 transition-all duration-200 font-semibold text-sm active:scale-[0.99]"
-          >
-            <span className="flex items-center justify-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              Add another food
-            </span>
-          </button>
-
-          <div className="pt-2">
             <button
-              onClick={handleContinue}
-              disabled={foods.filter((f) => f.name.trim()).length === 0}
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-bold text-base hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-lg shadow-emerald-200/50 hover:shadow-xl hover:shadow-emerald-300/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none active:scale-[0.98]"
+              onClick={handleCalculate}
+              className="mt-6 w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-200/60 hover:shadow-xl hover:shadow-emerald-200/70 transition-all duration-200 active:scale-[0.98]"
             >
-              <span className="flex items-center justify-center gap-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                Calculate Nutrition
-              </span>
+              Calculate Nutrition
+            </button>
+
+            <button
+              onClick={handleBackToUpload}
+              className="mt-3 w-full text-sm font-semibold text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Use a different photo
             </button>
           </div>
         </div>

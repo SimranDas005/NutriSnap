@@ -109,18 +109,19 @@ func (s *GeminiService) sendPrompt(parts ...geminiPart) (string, error) {
 func (s *GeminiService) AnalyzeImage(imageData []byte, mimeType string) (*models.AnalyzeResponse, error) {
 	encoded := base64.StdEncoding.EncodeToString(imageData)
 
-	prompt := `You are a food identification expert. Analyze the uploaded meal image and identify ALL visible food items and ingredients.
+	prompt := `You are a food identification and portion estimation expert. Analyze the uploaded meal image.
+Identify the MAIN dish by its common name, then list the major components/ingredients visible and estimate their portion size from the image.
 Return JSON only.
 
 Schema:
-{"foods": [{"name": "string", "confidence": 0.0-1.0}]}
+{"dish": "string", "parts": [{"name": "string", "confidence": 0.0-1.0, "portion": "small" | "medium" | "large"}]}
 
 Rules:
+- "dish" is the single main dish name in lowercase (e.g. "pizza", "burger", "chicken biryani").
+- "parts" lists the major ingredients/components of the dish (e.g. for pizza: "cheese", "basil", "tomato sauce"; for a burger: "cheese", "lettuce", "tomato", "bun").
+- For each part, estimate the portion from the visual quantity: "small" for a little, "medium" for a typical amount, "large" for an abundant amount.
+- Do not include the dish name itself inside "parts".
 - Return common food names in lowercase.
-- Include EVERY visible food item — list the main dish AND all visible toppings, fillings, and ingredients separately.
-- For example, for a pizza: list "pizza", "cheese", "basil", "tomato sauce", etc.
-- For a burger: list "burger", "cheese", "lettuce", "tomato", etc.
-- Be thorough and mention every edible thing you see.
 - Do not explain.
 - Return valid JSON only.
 - If uncertain, provide your best estimate.`
@@ -167,6 +168,33 @@ Rules:
 	var entry models.NutritionEntry
 	if err := json.Unmarshal([]byte(text), &entry); err != nil {
 		log.Printf("Failed to parse Gemini nutrition for %q: %s", foodName, text)
+		return nil, fmt.Errorf("failed to parse nutrition data: %w", err)
+	}
+
+	return &entry, nil
+}
+
+func (s *GeminiService) EstimateNutritionForWeight(foodName string, weightGrams float64) (*models.NutritionEntry, error) {
+	prompt := fmt.Sprintf(`Estimate the TOTAL nutrition for %g grams of "%s".
+Return JSON only with realistic values for that exact weight.
+
+Schema:
+{"calories": 123, "protein": 1.2, "carbs": 1.2, "fat": 1.2, "fiber": 1.2, "sugar": 1.2, "sodium": 123, "vitamin_a": 123, "vitamin_c": 1.2, "calcium": 123, "iron": 1.2}
+
+Rules:
+- Values must reflect the FULL %g grams of the food.
+- Use realistic per-100g nutrition scaled to that weight.
+- Do not explain.
+- Return valid JSON only.`, weightGrams, foodName, weightGrams)
+
+	text, err := s.sendPrompt(geminiPart{Text: prompt})
+	if err != nil {
+		return nil, err
+	}
+
+	var entry models.NutritionEntry
+	if err := json.Unmarshal([]byte(text), &entry); err != nil {
+		log.Printf("Failed to parse Gemini nutrition for %g grams of %q: %s", weightGrams, foodName, text)
 		return nil, fmt.Errorf("failed to parse nutrition data: %w", err)
 	}
 

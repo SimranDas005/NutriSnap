@@ -6,6 +6,8 @@ import { NutritionResponse } from '@/types'
 export default function Results() {
   const router = useRouter()
   const [data, setData] = useState<NutritionResponse | null>(null)
+  const [dish, setDish] = useState<string>('')
+  const [weight, setWeight] = useState<string>('')
 
   useEffect(() => {
     const raw = sessionStorage.getItem('nutrisnap_result')
@@ -14,6 +16,8 @@ export default function Results() {
       return
     }
     setData(JSON.parse(raw))
+    setDish(sessionStorage.getItem('nutrisnap_dish') || '')
+    setWeight(sessionStorage.getItem('nutrisnap_weight') || '')
   }, [router])
 
   if (!data) return null
@@ -28,7 +32,13 @@ export default function Results() {
           </div>
           <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">NutriSnap</h1>
         </div>
-        <div className="flex items-center justify-center gap-2">
+        {dish && (
+          <h2 className="text-3xl font-black text-gray-900 capitalize mt-3">{dish}</h2>
+        )}
+        {weight && (
+          <p className="text-sm text-gray-400 font-semibold mt-1.5">{weight} g total</p>
+        )}
+        <div className="flex items-center justify-center gap-2 mt-1">
           <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 animate-pulse" />
           <p className="text-sm text-gray-400 font-medium">Your complete meal breakdown</p>
         </div>
