@@ -1,7 +1,6 @@
 export interface FoodDetection {
   name: string
   confidence: number
-  portion?: 'small' | 'medium' | 'large'
 }
 
 export interface AnalyzeResponse {
@@ -11,7 +10,6 @@ export interface AnalyzeResponse {
 
 export interface FoodSelection {
   name: string
-  portion: 'small' | 'medium' | 'large'
 }
 
 export interface NutritionRequest {

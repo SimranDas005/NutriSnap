@@ -3,7 +3,6 @@ package models
 type FoodDetection struct {
 	Name       string  `json:"name"`
 	Confidence float64 `json:"confidence"`
-	Portion    string  `json:"portion"`
 }
 
 type AnalyzeResponse struct {
@@ -12,8 +11,7 @@ type AnalyzeResponse struct {
 }
 
 type FoodSelection struct {
-	Name    string `json:"name"`
-	Portion string `json:"portion"`
+	Name string `json:"name"`
 }
 
 type NutritionRequest struct {
@@ -55,10 +53,6 @@ type NutritionResponse struct {
 	Items  []NutritionItem `json:"items"`
 	Totals NutritionEntry  `json:"totals"`
 }
-
-type PortionSizes map[string]NutritionEntry
-
-type NutritionDB map[string]PortionSizes
 
 type ErrorResponse struct {
 	Error string `json:"error"`

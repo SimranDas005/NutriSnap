@@ -5,6 +5,9 @@ frontend/node_modules/
 frontend/.next/
 frontend/out/
 
+# TypeScript build info
+*.tsbuildinfo
+
 # Environment variables (contains API keys - NEVER commit)
 backend/.env
 .env

@@ -30,7 +30,6 @@ AI-powered food detection → instant, detailed nutrition breakdown for every bi
 - 🧠 Google Gemini **2.5 Flash** vision model
 - 🍽️ Identifies the **main dish** *and* its **major components/ingredients** (with confidence scores)
 - ⚖️ Weight-based nutrition — type the total dish weight, nutrients are split across the components
-- 📚 Static nutrition database fallback (small / medium / large portions) when no weight is given
 - 📈 Full nutrient panel: calories, protein, carbs, fat, fiber, sugar, sodium, vitamin A, vitamin C, calcium, iron
 - 🥧 Macro distribution bars + expandable per-component breakdown
 - 🚦 Graceful quota handling (clear `429` message when the Gemini free tier is exhausted)
@@ -54,7 +53,7 @@ go run ./cmd/server/main.go
 
 > 🌐 Server runs at `http://localhost:8080`
 >
-> ⚠️ Run from the `backend/` directory — the server loads `.env` and `assets/nutrition-db.json` relative to the working directory.
+> ⚠️ Run from the `backend/` directory — the server loads `.env` relative to the working directory.
 
 ### 2️⃣ Start the frontend
 
@@ -80,7 +79,7 @@ npm run dev
                                                        ▼
                                               ┌─────────────────────┐
                                               │   Nutrition Engine  │
-                                              │ (Gemini + static DB)│
+                                              │  Gemini estimation  │
                                               └─────────┬───────────┘
                                                         ▼
                                                ┌─────────────────────┐
@@ -90,9 +89,9 @@ npm run dev
 ```
 
 1. **Upload** a meal photo.
-2. **Analyze** — Gemini identifies the main dish and its major components, each with a confidence score and an estimated relative portion.
+2. **Analyze** — Gemini identifies the main dish and its major components, each with a confidence score.
 3. **Weigh** — you enter the total weight of the dish in grams (image-based gram estimation is unreliable).
-4. **Calculate** — the weight is split across the components and Gemini estimates nutrition for each part; a static database provides a portion-based fallback.
+4. **Calculate** — the weight is split across the components and Gemini estimates the nutrition of each part.
 5. **Review** — see totals, macro distribution, detailed nutrients, and a per-component breakdown.
 
 ---
@@ -111,9 +110,9 @@ curl -F "image=@my-meal.jpg" http://localhost:8080/analyze
 {
   "dish": "pizza",
   "parts": [
-    { "name": "cheese", "confidence": 0.95, "portion": "medium" },
-    { "name": "tomato sauce", "confidence": 0.88, "portion": "small" },
-    { "name": "basil", "confidence": 0.80, "portion": "small" }
+    { "name": "cheese", "confidence": 0.95 },
+    { "name": "tomato sauce", "confidence": 0.88 },
+    { "name": "basil", "confidence": 0.80 }
   ]
 }
 ```
@@ -129,8 +128,8 @@ curl -X POST http://localhost:8080/nutrition \
     "dish": "pizza",
     "weight_grams": 350,
     "foods": [
-      { "name": "cheese", "portion": "medium" },
-      { "name": "tomato sauce", "portion": "small" }
+      { "name": "cheese" },
+      { "name": "tomato sauce" }
     ]
   }'
 ```
@@ -157,7 +156,7 @@ curl -X POST http://localhost:8080/nutrition \
 }
 ```
 
-> 💡 When `weight_grams` is omitted or `0`, the API falls back to the static portion database (`small` / `medium` / `large`).
+> ⚠️ `weight_grams` is required — requests without a positive weight return `400`.
 
 ### Responses
 
@@ -182,9 +181,7 @@ Nutri/
 │   │   ├── models/             # Request/response data models
 │   │   └── services/
 │   │       ├── gemini.go       # Gemini vision + nutrition estimation
-│   │       └── nutrition.go    # Nutrition engine (weight + DB fallback)
-│   ├── assets/
-│   │   └── nutrition-db.json   # 💾 Static nutrition database
+│   │       └── nutrition.go    # Nutrition engine (splits weight across components)
 │   └── .env.example            # GEMINI_API_KEY, PORT
 │
 └── 🎨 frontend/                # Next.js app
@@ -204,7 +201,7 @@ Nutri/
 | 🖥️ Frontend | Next.js · React · TailwindCSS · TypeScript   |
 | ⚙️ Backend  | Go · `net/http`                              |
 | 🧠 AI       | Google Gemini 2.5 Flash (vision + text)      |
-| 💾 Storage  | Static JSON database (in-memory & stateless) |
+| 💾 Storage  | In-memory only & stateless (no database)   |
 
 ---
 

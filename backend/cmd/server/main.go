@@ -38,10 +38,7 @@ func loadEnv(path string) {
 func main() {
 	loadEnv(".env")
 	gemini := services.NewGeminiService()
-	nutrition, err := services.NewNutritionService(gemini)
-	if err != nil {
-		log.Fatalf("Failed to initialize nutrition service: %v", err)
-	}
+	nutrition := services.NewNutritionService(gemini)
 
 	h := handlers.NewHandler(gemini, nutrition)
 

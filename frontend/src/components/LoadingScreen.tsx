@@ -8,7 +8,7 @@ export default function LoadingScreen() {
       </div>
       <div className="text-center space-y-1.5">
         <p className="text-lg font-bold text-gray-700">Analyzing your meal...</p>
-        <p className="text-sm text-gray-400 font-medium">Identifying dishes and estimating portions</p>
+        <p className="text-sm text-gray-400 font-medium">Identifying dishes and ingredients</p>
       </div>
       <div className="flex gap-1.5">
         <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />

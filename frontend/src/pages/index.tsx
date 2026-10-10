@@ -64,7 +64,6 @@ export default function Home() {
         weight_grams: grams,
         foods: detectedParts.parts.map((p) => ({
           name: p.name,
-          portion: p.portion || 'medium',
         })),
       })
 
