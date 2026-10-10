@@ -19,6 +19,8 @@ type GeminiService struct {
 	client *http.Client
 }
 
+var ErrQuotaExceeded = fmt.Errorf("Gemini API quota exceeded")
+
 type geminiRequest struct {
 	Contents []geminiContent `json:"contents"`
 }
@@ -84,6 +86,9 @@ func (s *GeminiService) sendPrompt(parts ...geminiPart) (string, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Gemini API error (status %d): %s", resp.StatusCode, string(respBody))
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusForbidden {
+			return "", ErrQuotaExceeded
+		}
 		return "", fmt.Errorf("Gemini API returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 

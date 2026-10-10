@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -66,6 +67,10 @@ func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.gemini.AnalyzeImage(data, mimeType)
 	if err != nil {
+		if errors.Is(err, services.ErrQuotaExceeded) {
+			writeError(w, http.StatusTooManyRequests, "AI analysis quota exceeded. Please try again tomorrow.")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "Unable to analyze image. Please try another photo.")
 		return
 	}
